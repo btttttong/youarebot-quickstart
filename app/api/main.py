@@ -23,7 +23,6 @@ async def get_message(body: GetMessageRequestModel):
                 new_msg_text (str): Ответ бота
                 dialog_id (str): ID диалога
     """
-
     app_logger.info(
         f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}"
     )

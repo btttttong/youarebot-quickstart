@@ -38,9 +38,10 @@ if command -v poetry &> /dev/null; then
   if [[ "$poetry_version" == "2.1.1" ]]; then
     echo "Poetry version is correct: $poetry_version"
   else
-    echo -e "${YELLOW}Poetry version is not correct. Updating...${NC}"
-    poetry self update 2.1.1
-    echo -e "${WHITE}Poetry updated successfully.${NC}"
+    echo -e "${YELLOW}Poetry version may not be correct. Watch out."
+    # echo -e "${YELLOW}Poetry version is not correct. Updating...${NC}"
+    # poetry self update 2.1.1
+    # echo -e "${WHITE}Poetry updated successfully.${NC}"
   fi
 else
   echo "Poetry is not installed. Installing..."
@@ -65,6 +66,9 @@ else
   echo -e "${RED}Failed to start SSH tunnel.${NC}"
 fi
 
+# 10. Log address for registration
+echo "Your address for registration is:"
+echo "http://$remote_host:$random_port"
 
 # Starting the app
 echo -e "${WHITE}Launching the app...${NC}"
@@ -72,8 +76,3 @@ poetry run fastapi dev app/api/main.py --host 0.0.0.0 --port 6872 &
 
 # Starting the web-client (streamlit)
 PYTHONPATH=$(pwd) poetry run streamlit run app/web/streamlit_app.py --server.port=8502 --server.address=0.0.0.0
-
-
-# 10. Log address for registration
-echo "Your address for registration is:"
-echo "http://$remote_host:$random_port"
