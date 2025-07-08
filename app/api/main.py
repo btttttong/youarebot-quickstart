@@ -4,25 +4,27 @@ from app.core.logging import app_logger
 from app.models import GetMessageRequestModel, GetMessageResponseModel, IncomingMessage, Prediction
 from random import random
 from uuid import uuid4
+from app.api.zero_shot_model import classify_text
 
 app = FastAPI()
 
 
 @app.post("/get_message", response_model=GetMessageResponseModel)
 async def get_message(body: GetMessageRequestModel):
-    """
-    This functions receives a message from HumanOrNot and returns a response
-        Parameters (JSON from POST-request):
-            body (GetMessageRequestModel): model with request data
-                dialog_id (UUID4): ID of the dialog where the message was sent
-                last_msg_text (str): text of the message
-                last_message_id (UUID4): ID of this message
+    app_logger.info(f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}")
 
-        Returns (JSON from response):
-            GetMessageResponseModel: model with response data
-                new_msg_text (str): Ответ бота
-                dialog_id (str): ID диалога
-    """
+    #  zero-shot:  label bot/human
+    candidate_labels = ["bot", "human"]
+    result = classify_text(body.last_msg_text, candidate_labels)
+
+    top_label = result["labels"][0]
+    confidence = result["scores"][0]
+    response_text = f"🤖 Prediction: {top_label.upper()} (confidence: {confidence:.2f})"
+
+    return GetMessageResponseModel(
+        new_msg_text=response_text,
+        dialog_id=body.dialog_id
+    )
     app_logger.info(
         f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}"
     )
