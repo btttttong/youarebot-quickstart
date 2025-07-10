@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, StrictStr
-from transformers import pipeline
+from transformers.pipelines import pipeline
 
 
 class CustomBaseModel(BaseModel):

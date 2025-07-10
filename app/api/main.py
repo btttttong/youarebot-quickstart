@@ -13,35 +13,32 @@ app = FastAPI()
 async def get_message(body: GetMessageRequestModel):
     app_logger.info(f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}")
 
-    #  zero-shot:  label bot/human
-    candidate_labels = ["bot", "human"]
-    result = classify_text(body.last_msg_text, candidate_labels)
+    input_msg = IncomingMessage(
+        id=uuid4(),
+        dialog_id=body.dialog_id,
+        participant_index=0,  # assume 0 for user
+        text=body.last_msg_text
+    )
 
-    top_label = result["labels"][0]
-    confidence = result["scores"][0]
-    response_text = f"🤖 Prediction: {top_label.upper()} (confidence: {confidence:.2f})"
+    prediction = predict(input_msg)  # Reuse prediction logic
+
+    response_text = f"🤖 BOT probability: {prediction.is_bot_probability:.2f}"
 
     return GetMessageResponseModel(
         new_msg_text=response_text,
         dialog_id=body.dialog_id
     )
-    app_logger.info(
-        f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}"
-    )
-    return GetMessageResponseModel(
-        new_msg_text=body.last_msg_text, dialog_id=body.dialog_id
-    )
 
 @app.post("/predict", response_model=Prediction)
 def predict(msg: IncomingMessage) -> Prediction:
-    """
-    Endpoint to save a message and get the probability
-    that this message if from bot .
+    candidate_labels = ["bot", "human"]
+    result = classify_text(msg.text, candidate_labels)
+    print(f"Model result for text '{msg.text}': {result}")
 
-    Returns a `Prediction` object.
-    """
+     # Compute actual probability from model
+    prob_dict = dict(zip(result["labels"], result["scores"]))
+    is_bot_probability = prob_dict.get("bot", 0.0)
 
-    is_bot_probability = random()  # Simulate a probability for the sake of example
     prediction_id = uuid4()
 
     return Prediction(
