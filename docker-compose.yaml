@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: student_pass
+      POSTGRES_DB: chat_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - student_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student -d chat_db || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    command: -m /models/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8000
+    volumes:
+      - ./models:/models
+    ports:
+      - "8000:8000"
+    networks:
+      - student_net
+
+  inference-and-ui:
+    build:
+      context: .
+    environment:
+      DB_USER: "student"
+      DB_PASSWORD: "student_pass"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "chat_db"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      llama:
+        condition: service_started
+    ports:
+      - "8001:8000"  # FastAPI API
+      - "8501:8501"  # Streamlit UI
+    networks:
+      - student_net
+
+volumes:
+  postgres_data:
+
+networks:
+  student_net:
+    driver: bridge
