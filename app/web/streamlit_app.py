@@ -107,11 +107,13 @@ if len(st.session_state.probs) > 0:
     accuracy_progress = []
     logloss_progress = []
 
-    for i in range(1, len(st.session_state.probs) + 1):
-        preds_so_far = [1 if p >= 0.5 else 0 for p in st.session_state.probs[:i]]
-        acc_so_far = accuracy_score(st.session_state.labels[:i], preds_so_far)
+    num_dialogues = len(st.session_state.probs) // 2
+    for i in range(1, num_dialogues + 1):
+        end_idx = i * 2
+        preds_so_far = [1 if p >= 0.5 else 0 for p in st.session_state.probs[:end_idx]]
+        acc_so_far = accuracy_score(st.session_state.labels[:end_idx], preds_so_far)
         try:
-            ll_so_far = log_loss(st.session_state.labels[:i], st.session_state.probs[:i])
+            ll_so_far = log_loss(st.session_state.labels[:end_idx], st.session_state.probs[:end_idx])
         except ValueError:
             ll_so_far = np.nan
         accuracy_progress.append(acc_so_far)
