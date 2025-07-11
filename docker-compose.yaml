@@ -22,6 +22,7 @@ services:
 
   llama:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    platform: linux/amd64
     command: -m /models/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8000
     volumes:
       - ./models:/models
