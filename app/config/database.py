@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2.extensions import connection as _connection
 from typing import List, Dict
 
-from config import DB_URL
+from app.config.config import DB_URL
 
 
 def get_db_connection() -> _connection:

@@ -1,5 +1,5 @@
 streamlit
-sklearn.metrics
+scikit-learn
 uuid
 requests
 numpy
@@ -8,5 +8,5 @@ uvicorn>=0.22.0
 psycopg2-binary>=2.9.6
 pydantic>=1.10.7,<2.0.0   
 transformers==4.31.0
---extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.3.1
+--extra-index-url https://download.pytorch.org/whl/cpu
