@@ -31,7 +31,7 @@ services:
     networks:
       - student_net
 
-  inference-and-ui:
+  fastapi:
     build:
       context: .
     environment:

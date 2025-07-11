@@ -2,13 +2,9 @@ from fastapi import FastAPI, HTTPException
 
 from app.core.logging import app_logger
 from app.models import GetMessageRequestModel, GetMessageResponseModel, IncomingMessage, Prediction
-from random import random
 from uuid import uuid4
-from app.api.zero_shot_model import classify_text
 import time
 import requests
-import uvicorn
-import psycopg2
 
 from app.config.database import insert_message, select_messages_by_dialog, init_db
 from app.config.config import (DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
@@ -27,83 +23,33 @@ def on_startup():
             app_logger.warning(f"Waiting for PostgreSQL... {e}")
             time.sleep(2)
 
-
-@app.post("/get_message", response_model=GetMessageResponseModel)
-async def get_message(body: GetMessageRequestModel):
-    app_logger.info(f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}")
-
-    # ⏹️ Create IncomingMessage object from body
-    input_msg = IncomingMessage(
-        id=uuid4(),
-        dialog_id=body.dialog_id,
-        participant_index=0,  # assume 0 for user
-        text=body.last_msg_text
-    )
-
-    # 1️⃣ Save user message
-    insert_message(
-        id=input_msg.id,
-        text=input_msg.text,
-        dialog_id=input_msg.dialog_id,
-        participant_index=input_msg.participant_index
-    )
-
-    # 2️⃣ Retrieve dialog history
-    conversation = select_messages_by_dialog(body.dialog_id)
-    if not conversation:
-        return GetMessageResponseModel(
-            new_msg_text="❌ No dialog history found.",
-            dialog_id=body.dialog_id
-        )
-
-    # 3️⃣ Format conversation as chat history for llama.cpp
-    chat_history = []
-    for msg in conversation:
-        role = "assistant" if msg["participant_index"] == 1 else "user"
-        chat_history.append({"role": role, "content": msg["text"]})
-
-    # 4️⃣ Query llama.cpp API (แทน predict)
-    response = requests.post(
-        LLAMA_URL,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer dummy-key"
-        },
-        json={
-            "model": "llama.cpp",
-            "messages": chat_history
-        }
-    )
-
-    if response.status_code != 200:
-        reply_text = "❌ LLM inference failed."
-    else:
-        reply_text = response.json()["choices"][0]["message"]["content"]
-
-    # 5️⃣ Save assistant reply
-    bot_msg_id = uuid4()
-    insert_message(
-        id=bot_msg_id,
-        text=reply_text,
-        dialog_id=body.dialog_id,
-        participant_index=1
-    )
-
-    # 6️⃣ Return result exactly how you did:
-    return GetMessageResponseModel(
-        new_msg_text=reply_text,
-        dialog_id=body.dialog_id
-    )
-
 @app.post("/predict", response_model=Prediction)
 def predict(msg: IncomingMessage) -> Prediction:
-    candidate_labels = ["bot", "human"]
-    result = classify_text(msg.text, candidate_labels)
-    print(f"Model result for text '{msg.text}': {result}")
+    classification_prompt = (
+        "What is the probability (between 0 and 1) that the following message was written by a bot? "
+        "Respond with only a number.\n\n"
+        f"Message: {msg.text}"
+    )
 
-     # Compute actual probability from model
-    prob_dict = dict(zip(result["labels"], result["scores"]))
-    is_bot_probability = prob_dict.get("bot", 0.0)
+    llama_response = requests.post(
+        LLAMA_URL,
+        headers={"Content-Type": "application/json"},
+        json={
+            "model": "llama.cpp",
+            "messages": [{"role": "user", "content": classification_prompt}]
+        }
+    )
+    app_logger.info(f"LLAMA response: {llama_response.status_code}, {llama_response.text}")
+
+    if llama_response.status_code != 200:
+        is_bot_probability = 0.5  # fallback
+    else:
+        reply_text = llama_response.json()["choices"][0]["message"]["content"]
+        try:
+            is_bot_probability = float(reply_text.strip())
+            is_bot_probability = min(max(is_bot_probability, 0.0), 1.0)  # Clamp between 0 and 1
+        except ValueError:
+            is_bot_probability = 0.5  # fallback if llama gave weird text
 
     prediction_id = uuid4()
 
@@ -113,4 +59,43 @@ def predict(msg: IncomingMessage) -> Prediction:
         dialog_id=msg.dialog_id,
         participant_index=msg.participant_index,
         is_bot_probability=is_bot_probability
+    )
+
+@app.post("/get_message", response_model=GetMessageResponseModel)
+async def get_message(body: GetMessageRequestModel):
+    app_logger.info(f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}")
+
+    # Create IncomingMessage
+    input_msg = IncomingMessage(
+        id=uuid4(),
+        dialog_id=body.dialog_id,
+        participant_index=0,
+        text=body.last_msg_text
+    )
+
+    # Save user message
+    insert_message(
+        id=input_msg.id,
+        text=input_msg.text,
+        dialog_id=input_msg.dialog_id,
+        participant_index=input_msg.participant_index
+    )
+
+    # Call predict() internally (no HTTP overhead)
+    prediction = predict(input_msg)
+    reply_text = f"🤖 Prediction done (is_bot={prediction.is_bot_probability:.2f})"
+
+    # Save assistant reply
+    bot_msg_id = uuid4()
+    insert_message(
+        id=bot_msg_id,
+        text=reply_text,
+        dialog_id=body.dialog_id,
+        participant_index=1
+    )
+
+    # Return result
+    return GetMessageResponseModel(
+        new_msg_text=reply_text,
+        dialog_id=body.dialog_id
     )
