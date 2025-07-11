@@ -5,8 +5,6 @@ from uuid import uuid4
 from sklearn.metrics import accuracy_score, log_loss
 import numpy as np
 
-from app.models import GetMessageRequestModel
-
 # Set env for MacOS watcher issue
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
@@ -28,7 +26,7 @@ if "probs" not in st.session_state:
 if "labels" not in st.session_state:
     st.session_state.labels = []  # Store simulated ground-truth labels
 
-default_echo_bot_url = "http://localhost:6872"
+default_echo_bot_url = "http://fastapi:8000"
 
 with st.sidebar:
     if st.button("Reset"):
@@ -48,46 +46,30 @@ if message := st.chat_input("Your message"):
     user_msg = {"role": "user", "content": message}
     st.session_state.messages.append(user_msg)
     st.chat_message("user").write(message)
+    st.write(f"DEBUG dialog_id: {st.session_state.dialog_id}")
 
-    # Call prediction API for user message
+    # Call FastAPI `/get_message`
     response = requests.post(
-        f"{default_echo_bot_url}/predict",
+        f"{default_echo_bot_url}/get_message",
         json={
-            "id": str(uuid4()),
             "dialog_id": st.session_state.dialog_id,
-            "participant_index": 0,
-            "text": message
+            "last_message_id": None,  # Optional: Fill if needed
+            "last_msg_text": message
         }
     ).json()
 
-    user_prob = response["is_bot_probability"]
-    st.session_state.probs.append(user_prob)
-    st.session_state.labels.append(0)  # Simulate user = human = 0
+    reply_text = response.get("new_msg_text", "❌ No reply")
+    is_bot_prob = response.get("is_bot_probability", 0.5)
 
     # Show probability next to user msg
-    st.write(f"🤖 BOT probability for your msg: {user_prob:.2f}")
+    st.write(f"🤖 BOT probability for your msg: {is_bot_prob:.2f}")
+    st.session_state.probs.append(is_bot_prob)
+    st.session_state.labels.append(0)  # User = human = 0
 
-    # Simulate echo bot reply (= exact same message)
-    bot_msg = {"role": "assistant", "content": message}
+    # Bot reply from LLM
+    bot_msg = {"role": "assistant", "content": reply_text}
     st.session_state.messages.append(bot_msg)
-    st.chat_message("assistant").write(message)
-
-    # Call prediction API for bot message
-    response_bot = requests.post(
-        f"{default_echo_bot_url}/predict",
-        json={
-            "id": str(uuid4()),
-            "dialog_id": st.session_state.dialog_id,
-            "participant_index": 1,
-            "text": message
-        }
-    ).json()
-
-    bot_prob = response_bot["is_bot_probability"]
-    st.session_state.probs.append(bot_prob)
-    st.session_state.labels.append(1)  # Simulate bot = bot = 1
-
-    st.write(f"🤖 BOT probability for bot echo: {bot_prob:.2f}")
+    st.chat_message("assistant").write(reply_text)
 
     st.rerun()
 
@@ -98,7 +80,7 @@ if len(st.session_state.probs) > 0:
     try:
         ll = log_loss(st.session_state.labels, st.session_state.probs)
     except ValueError:
-        ll = np.nan  # Handle log_loss edge case when probabilities degenerate early
+        ll = np.nan
 
     st.sidebar.markdown(f"**Live Accuracy:** {acc:.2f}")
     st.sidebar.markdown(f"**Live Log-Loss:** {ll:.2f}")
@@ -107,13 +89,12 @@ if len(st.session_state.probs) > 0:
     accuracy_progress = []
     logloss_progress = []
 
-    num_dialogues = len(st.session_state.probs) // 2
+    num_dialogues = len(st.session_state.probs)
     for i in range(1, num_dialogues + 1):
-        end_idx = i * 2
-        preds_so_far = [1 if p >= 0.5 else 0 for p in st.session_state.probs[:end_idx]]
-        acc_so_far = accuracy_score(st.session_state.labels[:end_idx], preds_so_far)
+        preds_so_far = [1 if p >= 0.5 else 0 for p in st.session_state.probs[:i]]
+        acc_so_far = accuracy_score(st.session_state.labels[:i], preds_so_far)
         try:
-            ll_so_far = log_loss(st.session_state.labels[:end_idx], st.session_state.probs[:end_idx])
+            ll_so_far = log_loss(st.session_state.labels[:i], st.session_state.probs[:i])
         except ValueError:
             ll_so_far = np.nan
         accuracy_progress.append(acc_so_far)
