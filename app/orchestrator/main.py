@@ -18,18 +18,32 @@ async def health():
 async def predict(msg: IncomingMessage) -> Prediction:
     """Forward prediction request to classifier service"""
     try:
+        print(f"Forwarding to classifier: {CLASSIFIER_URL}/predict")
+        print(f"Message data: {msg.model_dump()}")
+        
+        # Convert UUIDs to strings for JSON serialization
+        msg_data = msg.model_dump()
+        msg_data['id'] = str(msg_data['id'])
+        msg_data['dialog_id'] = str(msg_data['dialog_id'])
+        
         response = requests.post(
             f"{CLASSIFIER_URL}/predict",
-            json=msg.dict(),
+            json=msg_data,
             headers={"Content-Type": "application/json"}
         )
+        
+        print(f"Classifier response: {response.status_code} - {response.text}")
         
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=f"Classifier service error: {response.text}")
         
         return Prediction(**response.json())
     except requests.exceptions.RequestException as e:
+        print(f"Request exception: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Unable to connect to classifier service: {str(e)}")
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @app.post("/get_message", response_model=GetMessageResponseModel)
 async def get_message(body: GetMessageRequestModel) -> GetMessageResponseModel:

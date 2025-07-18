@@ -15,7 +15,7 @@ mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 model = None
 
 @app.on_event("startup")
-async def load_model():
+def load_model():
     global model
     try:
         # Load the champion model from MLflow

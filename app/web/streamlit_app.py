@@ -49,29 +49,51 @@ if message := st.chat_input("Your message"):
     st.write(f"DEBUG dialog_id: {st.session_state.dialog_id}")
 
     # Call FastAPI `/predict` to get bot probability
-    predict_response = requests.post(
-        f"{default_echo_bot_url}/predict",
-        json={
-            "id": str(uuid4()),
-            "dialog_id": st.session_state.dialog_id,
-            "participant_index": 0,
-            "text": message
-        }
-    ).json()
-
-    is_bot_prob = predict_response.get("is_bot_probability", 0.5)
+    try:
+        predict_response = requests.post(
+            f"{default_echo_bot_url}/predict",
+            json={
+                "id": str(uuid4()),
+                "dialog_id": st.session_state.dialog_id,
+                "participant_index": 0,
+                "text": message
+            }
+        )
+        st.write(f"DEBUG predict status: {predict_response.status_code}")
+        st.write(f"DEBUG predict response: {predict_response.text}")
+        
+        if predict_response.status_code == 200:
+            predict_data = predict_response.json()
+            is_bot_prob = predict_data.get("is_bot_probability", 0.5)
+        else:
+            st.error(f"Predict API error: {predict_response.status_code} - {predict_response.text}")
+            is_bot_prob = 0.5
+    except Exception as e:
+        st.error(f"Error calling predict API: {str(e)}")
+        is_bot_prob = 0.5
 
     # Call FastAPI `/get_message` to get LLM response
-    response = requests.post(
-        f"{default_echo_bot_url}/get_message",
-        json={
-            "dialog_id": st.session_state.dialog_id,
-            "last_message_id": None,  # Optional: Fill if needed
-            "last_msg_text": message
-        }
-    ).json()
-
-    reply_text = response.get("new_msg_text", "❌ No reply")
+    try:
+        response = requests.post(
+            f"{default_echo_bot_url}/get_message",
+            json={
+                "dialog_id": st.session_state.dialog_id,
+                "last_message_id": None,  # Optional: Fill if needed
+                "last_msg_text": message
+            }
+        )
+        st.write(f"DEBUG get_message status: {response.status_code}")
+        st.write(f"DEBUG get_message response: {response.text}")
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            reply_text = response_data.get("new_msg_text", "❌ No reply")
+        else:
+            st.error(f"Get message API error: {response.status_code} - {response.text}")
+            reply_text = "❌ API Error"
+    except Exception as e:
+        st.error(f"Error calling get_message API: {str(e)}")
+        reply_text = "❌ Connection Error"
 
     # Show probability next to user msg
     st.write(f"🤖 BOT probability for your msg: {is_bot_prob:.2f}")
