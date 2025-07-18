@@ -26,7 +26,7 @@ if "probs" not in st.session_state:
 if "labels" not in st.session_state:
     st.session_state.labels = []  # Store simulated ground-truth labels
 
-default_echo_bot_url = "http://fastapi:8000"
+default_echo_bot_url = "http://orchestrator:8000"
 
 with st.sidebar:
     if st.button("Reset"):
@@ -48,7 +48,20 @@ if message := st.chat_input("Your message"):
     st.chat_message("user").write(message)
     st.write(f"DEBUG dialog_id: {st.session_state.dialog_id}")
 
-    # Call FastAPI `/get_message`
+    # Call FastAPI `/predict` to get bot probability
+    predict_response = requests.post(
+        f"{default_echo_bot_url}/predict",
+        json={
+            "id": str(uuid4()),
+            "dialog_id": st.session_state.dialog_id,
+            "participant_index": 0,
+            "text": message
+        }
+    ).json()
+
+    is_bot_prob = predict_response.get("is_bot_probability", 0.5)
+
+    # Call FastAPI `/get_message` to get LLM response
     response = requests.post(
         f"{default_echo_bot_url}/get_message",
         json={
@@ -59,7 +72,6 @@ if message := st.chat_input("Your message"):
     ).json()
 
     reply_text = response.get("new_msg_text", "❌ No reply")
-    is_bot_prob = response.get("is_bot_probability", 0.5)
 
     # Show probability next to user msg
     st.write(f"🤖 BOT probability for your msg: {is_bot_prob:.2f}")

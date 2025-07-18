@@ -179,3 +179,4 @@ cython_debug/
 
 models/
 models/*.gguf
+CLAUDE.md

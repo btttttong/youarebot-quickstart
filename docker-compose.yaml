@@ -1,59 +1,96 @@
-version: '3.9'
+version: '3.8'
 
 services:
-  postgres:
-    image: postgres:latest
-    environment:
-      POSTGRES_USER: student
-      POSTGRES_PASSWORD: student_pass
-      POSTGRES_DB: chat_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  mlflow:
+    image: python:3.11-slim
+    container_name: mlflow
     ports:
-      - "5432:5432"
-    networks:
-      - student_net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U student -d chat_db || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
-  llama:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    platform: linux/amd64
-    command: -m /models/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8000
+      - "5001:5000"
     volumes:
+      - ./mlruns:/mlruns
       - ./models:/models
-    ports:
-      - "8000:8000"
-    networks:
-      - student_net
+    working_dir: /app
+    command: >
+      bash -c "
+      pip install mlflow[extras]==2.10.2 &&
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///mlruns --default-artifact-root file:///models
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  fastapi:
+  classifier:
     build:
       context: .
-    environment:
-      DB_USER: "student"
-      DB_PASSWORD: "student_pass"
-      DB_HOST: "postgres"
-      DB_PORT: "5432"
-      DB_NAME: "chat_db"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      llama:
-        condition: service_started
+      dockerfile: Dockerfile.classifier
+    container_name: classifier
     ports:
-      - "8001:8000"  # FastAPI API
-      - "8501:8501"  # Streamlit UI
-    networks:
-      - student_net
+      - "8001:8000"
+    depends_on:
+      - mlflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-volumes:
-  postgres_data:
+  llm:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./models:/models
+    command: >
+      --host 0.0.0.0 --port 11434 
+      --model /models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+      --ctx-size 2048
+      --threads 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-networks:
-  student_net:
-    driver: bridge
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    container_name: orchestrator
+    ports:
+      - "8000:8000"
+    depends_on:
+      - classifier
+      - llm
+    environment:
+      - CLASSIFIER_URL=http://classifier:8000
+      - LLM_URL=http://llm:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: web
+    ports:
+      - "8501:8501"
+    depends_on:
+      - orchestrator
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
