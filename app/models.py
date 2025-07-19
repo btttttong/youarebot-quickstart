@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, StrictStr
-from transformers.pipelines import pipeline
 
 
 class CustomBaseModel(BaseModel):
@@ -11,6 +10,11 @@ class CustomBaseModel(BaseModel):
             if isinstance(value, UUID):
                 data[key] = str(value)
         return data
+
+
+class TextInput(BaseModel):
+    """Simple input model for youare.bot compatibility and direct text classification"""
+    text: str
 
 
 class GetMessageRequestModel(CustomBaseModel):

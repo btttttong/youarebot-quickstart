@@ -28,8 +28,8 @@ mlruns/
 *.db
 *.sqlite
 
-# Exclude the large app directory since we only need simple_main.py
-app/
+# Include app directory for restructured deployment
+# app/
 
 # Docker files
 docker-compose.yaml

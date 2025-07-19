@@ -2,11 +2,12 @@ app = "supakavadee-r-harbour-ml-solution"
 primary_region = "dfw"
 
 [build]
-  dockerfile = "Dockerfile.test"
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "8000"
   USE_MEMORY_DB = "true"
+  MODEL_PATH = "/models/bot_classifier"
 
 [[services]]
   protocol = "tcp"
