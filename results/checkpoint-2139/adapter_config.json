@@ -23,8 +23,8 @@
   "rank_pattern": {},
   "revision": null,
   "target_modules": [
-    "query",
-    "value"
+    "value",
+    "query"
   ],
   "task_type": "SEQ_CLS",
   "use_dora": false,

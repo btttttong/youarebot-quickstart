@@ -13,7 +13,7 @@ services:
     command: >
       bash -c "
       pip install mlflow[extras]==2.10.2 &&
-      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///mlruns --default-artifact-root file:///models
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlruns/mlflow.db --default-artifact-root file:///models
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
