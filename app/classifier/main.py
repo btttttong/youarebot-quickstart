@@ -16,16 +16,45 @@ model = None
 
 @app.on_event("startup")
 def load_model():
-    global model
+    global model, tokenizer_global
+    model_path = "/models/bot_classifier"
+    
+    print(f"=== Classifier Service Startup ===")
+    print(f"Looking for model at: {model_path}")
+    
+    # Check if the models directory exists
+    models_dir = "/models"
+    if os.path.exists(models_dir):
+        print(f"Models directory exists: {models_dir}")
+        print(f"Contents: {os.listdir(models_dir)}")
+    else:
+        print(f"Models directory does not exist: {models_dir}")
+    
     try:
-        # Load the champion model from MLflow
-        # This assumes there's a registered model named "bot_classifier"
-        model = mlflow.pyfunc.load_model("models:/bot_classifier/Champion")
-        print("Model loaded successfully from MLflow")
+        if os.path.exists(model_path):
+            print(f"Bot classifier directory found: {model_path}")
+            print(f"Model files: {os.listdir(model_path)}")
+            
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            tokenizer_global = AutoTokenizer.from_pretrained(model_path)
+            
+            print(f"✅ Model loaded successfully from {model_path}")
+            print(f"Model type: {type(model)}")
+            print(f"Tokenizer type: {type(tokenizer_global)}")
+        else:
+            print(f"❌ Model path {model_path} does not exist")
+            print("To train a model, run: python models/train_lora.py")
+            model = None
+            tokenizer_global = None
     except Exception as e:
-        print(f"Warning: Could not load model from MLflow: {e}")
-        # Fallback to a simple rule-based classifier
+        print(f"❌ Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         model = None
+        tokenizer_global = None
+    
+    print(f"Model loading complete. Model available: {model is not None}")
 
 @app.get("/health")
 async def health():
@@ -48,18 +77,19 @@ async def predict(msg: IncomingMessage) -> Prediction:
         
         is_bot_probability = min(is_bot_probability, 1.0)
     else:
-        # Use the MLflow model for prediction
+        # Use the transformers model for prediction
         try:
-            # Assuming the model expects a pandas DataFrame with a 'text' column
-            import pandas as pd
-            df = pd.DataFrame({'text': [msg.text]})
-            prediction_result = model.predict(df)
+            import torch
+            from torch.nn.functional import softmax
             
-            # Extract probability (assuming the model returns probabilities)
-            if hasattr(prediction_result, '__iter__') and not isinstance(prediction_result, str):
-                is_bot_probability = float(prediction_result[0])
-            else:
-                is_bot_probability = float(prediction_result)
+            # Tokenize the input
+            inputs = tokenizer_global(msg.text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            
+            # Get prediction
+            with torch.no_grad():
+                outputs = model(**inputs)
+                probabilities = softmax(outputs.logits, dim=-1)
+                is_bot_probability = probabilities[0][1].item()  # Probability of class 1 (bot)
             
             # Ensure probability is between 0 and 1
             is_bot_probability = max(0.0, min(1.0, is_bot_probability))
