@@ -7,10 +7,19 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install minimal Python dependencies
+# Install basic Python dependencies first
 RUN pip install --no-cache-dir fastapi==0.116.1 uvicorn==0.35.0 pydantic==2.11.7
 
-# Copy the simple test application
+# Install CPU-only PyTorch for faster builds and smaller image
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu
+
+# Install transformers after PyTorch
+RUN pip install --no-cache-dir transformers==4.41.2
+
+# Copy the trained model
+COPY models/bot_classifier/ /models/bot_classifier/
+
+# Copy the enhanced application with model loading
 COPY simple_test_main.py .
 
 # Expose port
