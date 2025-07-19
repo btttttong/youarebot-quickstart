@@ -182,3 +182,4 @@ models/*.gguf
 CLAUDE.md
 mlruns/
 final_model/
+final_model/
