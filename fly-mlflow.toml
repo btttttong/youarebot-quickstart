@@ -1,0 +1,34 @@
+app = "supakavadee-r-mlflow"
+primary_region = "dfw"
+
+[build]
+  dockerfile = "Dockerfile.mlflow"
+
+[env]
+  PORT = "5000"
+
+[[mounts]]
+  source = "supakavadee_mlflow"
+  destination = "/mlruns"
+
+[[mounts]]
+  source = "supakavadee_models"
+  destination = "/models"
+
+[http_services]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_services.machine]]
+    cpu_kind = "shared"
+    cpus = 1
+    memory_mb = 512
+
+[machines]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

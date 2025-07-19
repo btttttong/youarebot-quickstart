@@ -8,7 +8,15 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(docker-compose restart:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(chmod:*)",
+      "Bash(./test-deployment.sh:*)",
+      "Bash(pkill:*)",
+      "Bash(docker build:*)",
+      "Bash(./test-simple-deploy.sh:*)",
+      "Bash(fly status:*)",
+      "Bash(fly logs:*)",
+      "Bash(fly deploy:*)"
     ],
     "deny": []
   }

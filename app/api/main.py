@@ -6,8 +6,8 @@ from uuid import uuid4
 import time
 import requests
 
-from app.config.database import insert_message, select_messages_by_dialog, init_db
-from app.config.config import (DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+from app.config.database_wrapper import insert_message, select_messages_by_dialog, init_db
+from app.config.config import USE_MEMORY_DB
 
 app = FastAPI()
 LLAMA_URL = "http://llama:8000/v1/chat/completions"

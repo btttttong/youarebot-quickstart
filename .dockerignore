@@ -1,7 +1,53 @@
+# Git
 .git
-.venv
+.gitignore
+
+# Python
 __pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Project specific - EXCLUDE LARGE DIRECTORIES
 notebooks
 tests
 materials
 results
+mlruns/
+*.db
+*.sqlite
+
+# Exclude the large app directory since we only need simple_main.py
+app/
+
+# Docker files
+docker-compose.yaml
+Dockerfile.*
+
+# Deployment files
+deploy-to-fly.sh
+test-deployment.sh
+README-deployment.md
+*.md
+
+# Test files  
+test_*.py
+register_*.py
+fix_*.py
+
+# Fly.io configs except main one
+fly-*.toml
+
+# Large model files we don't need
+models/qwen2.5-0.5b-instruct-q4_k_m.gguf

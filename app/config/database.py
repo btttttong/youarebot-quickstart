@@ -1,11 +1,18 @@
-import psycopg2
-from psycopg2.extensions import connection as _connection
-from typing import List, Dict
+try:
+    import psycopg2
+    from psycopg2.extensions import connection as _connection
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
+    _connection = None
 
+from typing import List, Dict
 from app.config.config import DB_URL
 
 
-def get_db_connection() -> _connection:
+def get_db_connection():
+    if not PSYCOPG2_AVAILABLE:
+        raise ImportError("psycopg2 not available - please install it or use USE_MEMORY_DB=true")
     return psycopg2.connect(DB_URL)
 
 
